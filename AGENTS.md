@@ -1,0 +1,101 @@
+# AGENTS.md — working in skills-articles
+
+Guidance for any AI assistant (Claude Code, GitHub Copilot, Cursor, Codex, …)
+working **inside this repository**, and the reference for how the catalog is
+consumed. This file is the **single source of truth**: `CLAUDE.md` next to it
+only does `@AGENTS.md`, so Claude Code loads it even when it would otherwise
+skip `AGENTS.md` (a `CLAUDE.local.md` present, an older version, or a session
+that can't read `AGENTS.md`).
+
+## What this repo is
+
+The source of truth for the skills behind Mazlum Tosun's blog articles — Medium and dev.to posts, cross-posting and the author footer. It is the public `skills-articles` module of the
+tosun-si skills catalog. A skill is a standard
+**Agent Skill** (`SKILL.md`, the [agentskills.io](https://agentskills.io) open
+standard): `skills/<domain>/<name>/SKILL.md` — YAML frontmatter with `name` +
+`description`, then the instructions body — plus an optional `templates/` folder.
+
+The same `SKILL.md` format is read natively by Claude Code, GitHub Copilot and
+Cursor, so there is **one format and one install path**, no per-tool conversion.
+
+## Install: with pollen
+
+Consumers install this module with [pollen](https://github.com/groupbees/pollen),
+per project or machine-wide. How to use pollen — configs, pinning
+(`revision: <sha>  # vX.Y.Z`, no lockfile), commands, errors — lives in the
+**`pollen` skill**, shipped and versioned with pollen (`groupbees/pollen`,
+`path: skills`). Do not restate it here: point to it.
+
+This repo's own [`pollen.yaml`](pollen.yaml) (`repo: local`) deploys the
+catalog into this repo, so agents working here use it; CI runs
+`pollen validate` on it.
+
+## Modules
+
+skills-articles is one module among others (`skills-core`, …), each its own repo
+versioned by its git tags. A consumer mixes modules by listing several `repos:` in its
+`pollen.yaml`. Skill names must be **unique across modules**: they deploy
+flat, map to a single `/<name>`, and pollen rejects two sources yielding the
+same name.
+
+## How a skill is used
+
+In every tool: **auto-used** when the prompt matches the skill's `description`
+(progressive disclosure), **or** invoked explicitly with `/<name>`.
+
+## The one rule to remember
+
+**Edit the source, never the installed copy.** Everything under a
+`.claude/skills/` or `.agents/skills/` is deployed by pollen. To change a
+skill: edit `skills/<domain>/<name>/SKILL.md`, then re-run `pollen update`.
+
+## Design choices
+
+- **Standard `SKILL.md`, nothing tool-specific** — portable across Claude Code,
+  Copilot and Cursor as-is.
+- **Validation in CI**: `.github/workflows/ci.yml` only calls the shared
+  `skills-module` workflow of `groupbees/.github` — change the checks there,
+  not here. Four checks:
+  1. [`skill-validator`](https://github.com/agent-ecosystem/skill-validator)
+     `check --strict` — spec conformance plus what the official validator does
+     not cover: token budgets, broken links, orphan files, description quality.
+  2. `pollen validate` — the catalog deploys the way consumers deploy it.
+  3. `scripts/skills-catalog.sh --check-readme` / `--check-names` — the README
+     table is generated (CI fails if it drifted); leaf names are unique.
+  4. `shellcheck` on every `*.sh`.
+- **No per-skill `README.md`.** The validator flags extra files at a skill root,
+  and duplicated docs rot: the human docs ARE `SKILL.md`.
+- **`templates/`** holds bundled runtime assets (the spec's own name is
+  `assets/`; CI passes `--allow-dirs=templates`).
+
+## Before adding a NEW skill — check for overlap
+
+Most skills are added by an AI agent, so the duplicate check is **your** job:
+
+1. **List what already exists** — `scripts/skills-catalog.sh --list` prints every skill's
+   `name` + `description` straight from the `SKILL.md` files. Do **not** rely on
+   the README table for this.
+2. **Compare semantically.** If an existing skill already covers the capability,
+   **extend** it, or **extract a shared skill** both can reference — do not add
+   an overlapping one.
+3. A duplicate **name** is rejected automatically (`--check-names` + CI). Semantic
+   **overlap** is the judgment call this list exists for.
+
+## Adding or changing a skill
+
+1. Create/edit `skills/<domain>/<name>/SKILL.md` — frontmatter is **only** `name`
+   (= folder name) + `description` (it drives both auto-use and the `/` picker).
+   Add `templates/` if the skill ships assets.
+2. `pollen update --dry-run`, then `pollen update` (deploys into this repo).
+3. `scripts/skills-catalog.sh --readme` to regenerate the README table, and commit it.
+4. Commit with the `commit-open-source` conventions, open the PR with
+   a descriptive title and body, release with `tag-opensource`.
+
+## Versioning
+
+Not per-skill. `SKILL.md` carries only `name` + `description`. Versioning is
+**catalog-wide via git tags** (semver `vX.Y.Z`, cut with `tag-opensource`), and
+the **GitHub Releases page is the changelog** — no hand-maintained
+`CHANGELOG.md`. Pin a release tag instead of `main` when you need stability.
+
+See `CONTRIBUTING.md` and `README.md` for more.
